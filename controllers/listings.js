@@ -24,7 +24,7 @@ module.exports.showListing = async (req, res) => {
   .populate("owner");
   if(!listing){
     req.flash("error", "Listing you requested for does not exist");
-    res.redirect("/listings");
+    return res.redirect("/listings");
   }
   console.log(listing);
   res.render("listings/show.ejs", { listing });
@@ -38,6 +38,15 @@ module.exports.createListing = async (req, res, next) => {
 })
   .send();
 
+  if (response.body.features.length === 0) {
+    req.flash("error", "Location not found. Please enter a valid location.");
+    return res.redirect("/listings/new");
+  }
+
+  if (!req.file) {
+    req.flash("error", "Please upload an image for the listing");
+    return res.redirect("/listings/new");
+  }
 
     let url= req.file.path;
     let filename = req.file.filename;
@@ -59,7 +68,7 @@ module.exports.createListing = async (req, res, next) => {
    const listing = await Listing.findById(id);
    if(!listing){
      req.flash("error", "Listing you requested for does not exist");
-     res.redirect("/listings");
+     return res.redirect("/listings");
    }
 
    let originalImageUrl = listing.image.url;
@@ -95,6 +104,11 @@ module.exports.updateListing = async (req, res) => {
         limit: 1,
       })
       .send();
+
+    if (response.body.features.length === 0) {
+      req.flash("error", "Location not found. Please enter a valid location.");
+      return res.redirect(`/listings/${id}/edit`);
+    }
 
     listing.geometry = response.body.features[0].geometry;
   }
