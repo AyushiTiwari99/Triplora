@@ -43,4 +43,9 @@ router
 router.get("/:id/edit", isLoggedIn, isOwner, wrapAsync(listingController.renderEditForm)
 );
 
+// Booking routes
+const bookingController = require("../controllers/bookings.js");
+router.post("/:id/book", isLoggedIn, wrapAsync(bookingController.createOrder));
+router.post("/:id/book/verify", isLoggedIn, wrapAsync(bookingController.verifyPayment));
+
 module.exports = router;

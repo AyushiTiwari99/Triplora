@@ -37,6 +37,26 @@
 <% } %>
 
 <div class="col-8 offset-3 mb-3">
+<% if(!currUser || !listing.owner._id.equals(currUser._id)) { %>
+  <hr>
+  <h4>Book this Listing</h4>
+  <form id="booking-form" class="needs-validation mt-3" novalidate>
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label for="check-in" class="form-label">Check-in Date</label>
+        <input type="date" id="check-in" class="form-control" required>
+        <div class="invalid-feedback">Please select a valid check-in date.</div>
+      </div>
+      <div class="col-md-6 mb-3">
+        <label for="check-out" class="form-label">Check-out Date</label>
+        <input type="date" id="check-out" class="form-control" required>
+        <div class="invalid-feedback">Please select a valid check-out date.</div>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-danger">Book Now</button>
+  </form>
+<% } %>
+
 <% if(currUser) {%>
   <hr>
   <h4>Leave a Review</h4>
@@ -101,5 +121,100 @@
 </div>
 
 <script src="/js/map.js"></script>
+
+<% if(!currUser || !listing.owner._id.equals(currUser._id)) { %>
+<script>
+  document.getElementById("booking-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    
+    // Check if user is logged in
+    const currUserExists = <%= currUser ? 'true' : 'false' %>;
+    if (!currUserExists) {
+      window.location.href = "/login";
+      return;
+    }
+    
+    const checkInVal = document.getElementById("check-in").value;
+    const checkOutVal = document.getElementById("check-out").value;
+    
+    if (!checkInVal || !checkOutVal) {
+      alert("Please select both Check-in and Check-out dates.");
+      return;
+    }
+    
+    const checkIn = new Date(checkInVal);
+    const checkOut = new Date(checkOutVal);
+    
+    if (checkOut <= checkIn) {
+      alert("Check-out date must be after Check-in date.");
+      return;
+    }
+    
+    try {
+      const response = await fetch("/listings/<%= listing._id %>/book", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: new URLSearchParams({ checkIn: checkInVal, checkOut: checkOutVal })
+      });
+      
+      const orderData = await response.json();
+      if (!orderData.success) {
+        alert(orderData.message || "Failed to create booking order.");
+        return;
+      }
+      
+      const options = {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "Triplora",
+        description: "Booking payment for <%= listing.title %>",
+        order_id: orderData.orderId,
+        handler: async function (paymentResponse) {
+          try {
+            const verifyResponse = await fetch("/listings/<%= listing._id %>/book/verify", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded"
+              },
+              body: new URLSearchParams({
+                razorpay_payment_id: paymentResponse.razorpay_payment_id,
+                razorpay_order_id: paymentResponse.razorpay_order_id,
+                razorpay_signature: paymentResponse.razorpay_signature
+              })
+            });
+            
+            const verifyResult = await verifyResponse.json();
+            if (verifyResult.success) {
+              window.location.href = "/listings/<%= listing._id %>";
+            } else {
+              alert(verifyResult.message || "Payment verification failed.");
+            }
+          } catch (verifyError) {
+            console.error(verifyError);
+            alert("Verification request failed.");
+          }
+        },
+        prefill: {
+          name: "<%= currUser ? currUser.username : '' %>",
+          email: "<%= currUser ? currUser.email : '' %>"
+        },
+        theme: {
+          color: "#fe424d"
+        }
+      };
+      
+      const rzp = new Razorpay(options);
+      rzp.open();
+      
+    } catch (err) {
+      console.error(err);
+      alert("Error initializing payment. Please try again.");
+    }
+  });
+</script>
+<% } %>
 
  
